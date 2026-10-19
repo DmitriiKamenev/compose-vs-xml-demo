@@ -1,81 +1,81 @@
 # compose-vs-xml-demo
 
-Одна и та же страница Android-приложения, реализованная двумя способами: **Jetpack Compose** и **XML + View System**.
+Один и тот же экран Android-приложения в двух реализациях: **Jetpack Compose** и **XML + View System**.
 Репозиторий — иллюстрация к статье «Сравнительный анализ Jetpack Compose и XML при разработке пользовательского интерфейса Android-приложения ReelsBlocker».
 
-## Что в демо
+## Начните со страницы `index.html`
 
-Экран «Настройки»: две кликабельные строки (иконка, заголовок, подзаголовок), два переключателя,
-кнопка-счетчик, строка статуса и нижняя навигация из трех пунктов.
+Самый быстрый способ увидеть разницу — открыть [`index.html`](index.html) в браузере (один файл, без зависимостей, работает офлайн).
+Если в репозитории включен GitHub Pages, страница доступна по адресу
+`https://ВАШ-АККАУНТ.github.io/compose-vs-xml-demo/`.
 
-Состояние и логика общие для обеих реализаций — `shared/DemoViewModel.kt` (StateFlow). Отличается только слой интерфейса:
+На странице:
+
+- **интерактивный макет экрана** в стиле ReelsBlocker: строки настроек, переключатели, счетчик и нижняя навигация;
+- **панель состояния**: любое действие меняет данные, а экран перерисовывается от них (`UI = f(State)`, как в Compose);
+- **отклоняемое включение**: переключатель «Блокировка по времени» не включается, потому что ViewModel оставляет значение `false`;
+  в Compose он возвращается сам, в XML возврат пишется вручную;
+- **код бок о бок**: строка с переключателем в Compose и в XML (разметка и связывание), строки синхронизации подсвечены;
+- **столбики с измерениями** строк кода из приложения ReelsBlocker.
+
+Страница только показывает идею и не требует сборки. Настоящий Android-код лежит в каталоге `app/`.
+
+## Android-проект
+
+Тот же экран, реализованный на Compose и на XML. Состояние и логика общие — `shared/DemoViewModel.kt` (StateFlow); отличается только слой интерфейса.
 
 | | Jetpack Compose | XML + View System |
 |---|---|---|
 | Экран | `compose/DemoScreen.kt` | `res/layout/activity_xml_demo.xml`, `item_setting_row.xml`, `item_switch_row.xml`, `res/menu/bottom_nav.xml` |
 | Связывание и обработчики | внутри composable-функций | `views/XmlDemoActivity.kt` (ViewBinding) |
 
-Один из переключателей («Блокировка по времени») намеренно **отклоняет** включение: ViewModel оставляет значение `false`.
-В Compose переключатель остается выключенным сам, поскольку состояние — единственный источник истины;
-в XML-варианте его нужно вернуть вручную (см. `bindSwitch` в `XmlDemoActivity.kt`).
+Состав экрана: две кликабельные строки, два переключателя (один отклоняет включение), кнопка-счетчик, строка статуса, нижняя навигация из трех пунктов.
 
-## Сравнение кода: строка настроек с переключателем
+### Запуск
 
-**Compose** (`DemoScreen.kt`):
+1. Откройте проект в Android Studio и выполните Sync.
+2. Запустите конфигурацию `app` на эмуляторе или устройстве (minSdk 24).
+3. На стартовом экране выберите реализацию: **Jetpack Compose** или **XML + View System**.
 
-```kotlin
-@Composable
-fun SwitchRow(title: String, subtitle: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleMedium)
-                Text(subtitle, style = MaterialTheme.typography.bodyMedium)
-            }
-            Switch(checked = checked, onCheckedChange = onCheckedChange)
-        }
-    }
-}
-// использование (состояние берется из ViewModel):
-SwitchRow("Уведомления", "Показывать оповещения", notifications, vm::onNotificationsChanged)
-```
+Версии инструментов (AGP, Kotlin, Compose BOM) заданы в `gradle/libs.versions.toml`.
 
-**XML + View System**: разметка `item_switch_row.xml` (32 строки), а также код связывания в `XmlDemoActivity.kt`:
+## Объем кода
 
-```kotlin
-row.switchView.setOnClickListener {
-    onChange(row.switchView.isChecked)
-    row.switchView.isChecked = current() // ViewModel мог отклонить изменение
-}
-// ...и подписка на состояние с учетом жизненного цикла:
-lifecycleScope.launch {
-    repeatOnLifecycle(Lifecycle.State.STARTED) {
-        launch { vm.notifications.collect { binding.rowNotifications.switchView.isChecked = it } }
-    }
-}
-```
+Считаются логические строки: без пустых строк, комментариев, `import`/`package` и `<?xml ?>`. Иконки, `LauncherActivity`, общий `DemoViewModel`, манифест и сборка не учитываются.
 
-## Подсчет строк кода
+**1. Измерения в приложении ReelsBlocker** (то, что приводится в статье и на странице `index.html`; код приложения закрытый и в репозиторий не входит):
 
-```
-python3 tools/count_loc.py
-```
+| Компонент | Compose | XML | Разница |
+|---|---|---|---|
+| Экран настроек | 118 | 153 | Compose короче на 23 % |
+| Параметры блокировки | 105 | 157 | Compose короче на 33 % |
+| Нижняя навигация | 84 | 52 | XML короче на 38 % |
+| **Всего** | **307** | **362** | **Compose короче на 15 %** |
 
-Считаются логические строки (без пустых, комментариев, `import`/`package`, `<?xml ?>`); векторные иконки, `LauncherActivity`, общий `DemoViewModel`, манифест и сборка не учитываются.
+Файлов: 3 против 13. Строк связывания состояния двух переключателей: 6 против 18.
+XML-вариант ReelsBlocker выполнен автором специально для сравнения, поэтому результат относится к одному приложению и трем компонентам.
 
-| | Compose | XML + View System |
+**2. Этот учебный пример** (`python3 tools/count_loc.py`):
+
+| | Compose | XML |
 |---|---|---|
 | Файлов | 2 | 5 |
 | Строк кода | 79 | 187 |
 
-> **Важно.** Это учебный пример «с чистого листа» на стандартном оформлении Material 3, где Compose использует цикл для пунктов навигации,
-> а XML описывает каждый элемент явно. Он иллюстрирует различия в подходах, но **не является репрезентативным измерением**:
-> в реальном приложении ReelsBlocker (см. статью) разница заметно меньше, а для нижней навигации XML-вариант оказался короче.
+> **Важно.** Учебный пример написан с чистого листа на стандартном Material 3, а Compose использует цикл для пунктов навигации.
+> Он иллюстрирует различия в подходах, но **не является репрезентативным измерением**: в реальном приложении разница заметно меньше (15 %),
+> а для нижней навигации XML короче. Для выводов используйте таблицу из пункта 1.
 
-## Запуск
+Скорость разработки и производительность не измерялись.
 
-1. Откройте проект в Android Studio.
-2. Выполните Sync и запустите конфигурацию `app` на эмуляторе или устройстве (minSdk 24).
-3. На стартовом экране выберите реализацию: **Jetpack Compose** или **XML + View System**.
+## Структура
 
-Версии инструментов (AGP, Kotlin, Compose BOM) заданы в `gradle/libs.versions.toml`.
+```
+index.html                 страница-иллюстрация (открывается в браузере)
+app/                       Android-проект
+  .../shared/              общий ViewModel и названия вкладок
+  .../compose/             реализация на Jetpack Compose
+  .../views/               реализация на XML + ViewBinding
+  res/layout, res/menu     разметка XML-варианта
+tools/count_loc.py         подсчет строк кода учебного примера
+```

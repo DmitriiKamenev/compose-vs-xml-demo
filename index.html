@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Compose и XML: один экран, два подхода</title>
+<style>
+  :root {
+    --bg: #010D1D;
+    --card: #0C1929;
+    --accent: #29BF9E;
+    --gray: #AFB3C2;
+    --white: #FFFFFF;
+    --line: rgba(175, 179, 194, .18);
+    --ui: Roboto, "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+    --code: ui-monospace, "JetBrains Mono", "Cascadia Mono", Consolas, "Roboto Mono", monospace;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--gray);
+    font: 16px/1.5 var(--ui);
+  }
+  a { color: var(--accent); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 40px 20px 72px; }
+
+  h1 { font-size: clamp(34px, 7vw, 56px); line-height: 1.05; font-weight: 400; margin: 0 0 14px; color: var(--white); }
+  h1 .ac { color: var(--accent); }
+  h2 { font-size: clamp(24px, 4vw, 32px); font-weight: 400; color: var(--white); margin: 0 0 8px; }
+  .lead { margin: 0 0 40px; max-width: 60ch; }
+  section { margin-top: 64px; }
+  section > p { max-width: 62ch; margin: 0 0 24px; }
+
+  /* ---------- Demo ---------- */
+  .demo { display: grid; grid-template-columns: 372px minmax(0, 1fr); gap: 40px; align-items: start; }
+  .phone {
+    width: 372px; height: 760px;
+    background: #000; border-radius: 40px; padding: 10px;
+    box-shadow: 0 0 0 1px var(--line);
+  }
+  .screen {
+    height: 100%; background: var(--bg); border-radius: 30px; overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  .content { flex: 1; overflow-y: auto; padding: 30px 10px 12px; }
+  .scr-title { margin: 0; text-align: center; font-size: 38px; font-weight: 400; color: var(--white); line-height: 1.1; }
+  .scr-title span { color: var(--accent); }
+  .scr-sub { margin: 14px 0 12px; text-align: center; font-size: 15px; color: var(--gray); }
+
+  .row, .swrow {
+    display: flex; align-items: center; gap: 15px;
+    background: var(--card); border-radius: 16px;
+    padding: 18px 15px; margin-bottom: 12px; width: 100%;
+    color: var(--white); text-align: left; border: 0; font: inherit;
+  }
+  button.row { cursor: pointer; }
+  button.row:active { background: #11243a; }
+  .row svg { width: 28px; height: 28px; fill: var(--accent); flex: none; }
+  .txt { flex: 1; min-width: 0; }
+  .txt b { display: block; font-weight: 400; font-size: 19px; line-height: 1.25; }
+  .txt small { display: block; font-size: 14px; color: var(--gray); margin-top: 3px; }
+
+  .sw {
+    flex: none; width: 52px; height: 32px; border-radius: 16px; border: 0; padding: 0;
+    background: var(--gray); position: relative; cursor: pointer; transition: background .15s;
+  }
+  .sw::after {
+    content: ""; position: absolute; top: 4px; left: 4px; width: 24px; height: 24px;
+    border-radius: 50%; background: var(--white); transition: transform .15s;
+  }
+  .sw[aria-checked="true"] { background: var(--accent); }
+  .sw[aria-checked="true"]::after { transform: translateX(20px); }
+
+  .reject { animation: shake .35s; }
+  @keyframes shake { 20% { transform: translateX(-6px); } 50% { transform: translateX(6px); } 80% { transform: translateX(-3px); } }
+
+  .counter {
+    background: var(--accent); color: var(--bg); border: 0; border-radius: 22px;
+    font: 500 15px var(--ui); padding: 11px 22px; cursor: pointer; margin: 4px 0 12px;
+  }
+  .status { color: var(--gray); font-size: 14px; min-height: 21px; }
+
+  .nav {
+    display: flex; background: var(--card); border-radius: 20px 20px 0 0; padding: 8px 4px 12px;
+  }
+  .nav button {
+    flex: 1; background: none; border: 0; color: var(--gray); font: 12px var(--ui);
+    display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 0; cursor: pointer;
+  }
+  .nav svg { width: 24px; height: 24px; fill: currentColor; }
+  .nav button[aria-current="true"] { color: var(--accent); }
+
+  .aside h3 { margin: 0 0 8px; font-size: 18px; font-weight: 400; color: var(--white); }
+  .aside p { margin: 0 0 20px; }
+  .state {
+    background: var(--card); border-radius: 16px; padding: 16px 18px; margin: 0 0 20px;
+    font: 14px/1.6 var(--code); color: var(--white); white-space: pre-wrap;
+  }
+  .state .k { color: var(--gray); }
+  .state .v { color: var(--accent); }
+  .formula { font: 15px var(--code); color: var(--accent); }
+
+  /* ---------- Code ---------- */
+  .cmp { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+  .col h3 { margin: 0 0 4px; font-size: 20px; font-weight: 400; color: var(--white); }
+  .col .meta { margin: 0 0 12px; font-size: 14px; }
+  .file { margin: 0 0 14px; }
+  .file > div { font: 13px var(--code); color: var(--gray); margin: 0 0 6px; }
+  pre {
+    margin: 0; background: var(--card); border-radius: 16px; padding: 16px 18px;
+    font: 13px/1.6 var(--code); color: #dfe4ee; overflow-x: auto; tab-size: 4;
+  }
+  pre .c { color: #7f8aa3; }
+  pre .hl { background: rgba(41, 191, 158, .2); border-radius: 3px; }
+  .legend { margin-top: 12px; font-size: 14px; }
+  .legend i { display: inline-block; width: 12px; height: 12px; background: rgba(41, 191, 158, .5); border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+
+  /* ---------- Metrics ---------- */
+  .bars { background: var(--card); border-radius: 16px; padding: 22px 22px 8px; }
+  .bar-row { margin-bottom: 18px; }
+  .bar-row .lbl { display: flex; justify-content: space-between; color: var(--white); font-size: 15px; margin-bottom: 6px; }
+  .bar-row .lbl em { font-style: normal; color: var(--gray); font-size: 14px; }
+  .bar { height: 14px; border-radius: 7px; margin-bottom: 5px; position: relative; }
+  .bar.cm { background: var(--accent); }
+  .bar.xm { background: repeating-linear-gradient(135deg, rgba(175,179,194,.75) 0 6px, rgba(175,179,194,.4) 6px 12px); }
+  .bar span { position: absolute; left: calc(100% + 8px); top: -3px; font-size: 13px; color: var(--white); white-space: nowrap; }
+  .keys { display: flex; gap: 20px; font-size: 14px; margin: 0 0 18px; }
+  .keys i { display: inline-block; width: 22px; height: 10px; border-radius: 5px; margin-right: 8px; vertical-align: 0; }
+  .keys .a { background: var(--accent); }
+  .keys .b { background: repeating-linear-gradient(135deg, rgba(175,179,194,.75) 0 4px, rgba(175,179,194,.4) 4px 8px); }
+  .facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 20px; }
+  .fact { background: var(--card); border-radius: 16px; padding: 16px 18px; }
+  .fact b { display: block; color: var(--white); font-weight: 400; font-size: 26px; line-height: 1.2; }
+  .fact b span { color: var(--accent); }
+  .fact small { display: block; font-size: 14px; margin-top: 4px; }
+  .note { margin-top: 20px; font-size: 14px; max-width: 70ch; }
+
+  footer { margin-top: 64px; padding-top: 20px; border-top: 1px solid var(--line); font-size: 14px; }
+  code { font-family: var(--code); font-size: .92em; color: var(--white); }
+
+  @media (max-width: 900px) {
+    .demo { grid-template-columns: 1fr; justify-items: center; }
+    .aside { width: 100%; max-width: 372px; }
+    .cmp { grid-template-columns: minmax(0, 1fr); }
+    .facts { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 420px) {
+    .phone { width: 100%; height: 720px; }
+    .wrap { padding-left: 14px; padding-right: 14px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .reject { animation: none; }
+    .sw, .sw::after { transition: none; }
+    html { scroll-behavior: auto; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Один экран, <span class="ac">два подхода</span></h1>
+    <p class="lead">Интерактивная иллюстрация к статье о сравнении Jetpack Compose и XML + View System на примере приложения для ограничения коротких видео.</p>
+  </header>
+
+  <section id="demo" style="margin-top:0">
+    <div class="demo">
+      <div class="phone" aria-label="Макет экрана приложения">
+        <div class="screen">
+          <div class="content" id="content"></div>
+          <nav class="nav" id="nav" aria-label="Нижняя навигация"></nav>
+        </div>
+      </div>
+
+      <div class="aside">
+        <h3>Интерфейс как функция состояния</h3>
+        <p>В Compose экран описывается от текущего состояния: <span class="formula">UI = f(State)</span>. Так работает и этот макет: любое действие меняет состояние ниже, а экран перерисовывается целиком.</p>
+        <pre class="state" id="state" aria-live="polite"></pre>
+        <h3>Что попробовать</h3>
+        <p>Включите «Блокировку по времени». Приложение отклоняет включение и оставляет в состоянии <code>false</code>, поэтому переключатель возвращается сам. В XML этот возврат нужно написать вручную (см. код ниже).</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="code">
+    <h2>Тот же переключатель в коде</h2>
+    <p>Строка настроек с переключателем, состояние которой хранится во ViewModel. Подсвечены строки, которые синхронизируют экран с состоянием.</p>
+
+    <div class="cmp">
+      <div class="col">
+        <h3>Jetpack Compose</h3>
+        <p class="meta">Один файл, интерфейс и связывание вместе</p>
+        <div class="file">
+          <div>DemoScreen.kt</div>
+<pre><span class="c">// компонент</span>
+@Composable
+fun SwitchRow(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleMedium)
+                Text(subtitle, style = MaterialTheme.typography.bodyMedium)
+            }
+            <span class="hl">Switch(checked = checked, onCheckedChange = onCheckedChange)</span>
+        }
+    }
+}
+
+<span class="c">// использование</span>
+<span class="hl">val timeBlock by vm.timeBlock.collectAsState()</span>
+<span class="hl">SwitchRow("Блокировка по времени", "Пока недоступно",
+          timeBlock, vm::onTimeBlockChanged)</span></pre>
+        </div>
+        <p class="legend"><i></i>Состояние берется из ViewModel тремя строками, отклонение изменения обрабатывается само.</p>
+      </div>
+
+      <div class="col col-xml">
+        <h3>XML + View System</h3>
+        <p class="meta">Разметка в одном файле, связывание в другом</p>
+        <div class="file">
+          <div>item_switch_row.xml</div>
+<pre>&lt;MaterialCardView
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="12dp"&gt;
+
+    &lt;LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="16dp"&gt;
+
+        &lt;LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"&gt;
+
+            &lt;TextView
+                android:id="@+id/title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textAppearance="?attr/textAppearanceTitleMedium" /&gt;
+
+            &lt;TextView
+                android:id="@+id/subtitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textAppearance="?attr/textAppearanceBodyMedium" /&gt;
+        &lt;/LinearLayout&gt;
+
+        &lt;MaterialSwitch
+            android:id="@+id/switchView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" /&gt;
+    &lt;/LinearLayout&gt;
+&lt;/MaterialCardView&gt;</pre>
+        </div>
+        <div class="file">
+          <div>XmlDemoActivity.kt</div>
+<pre><span class="c">// заполнение и обработчик</span>
+private fun bindSwitch(
+    row: ItemSwitchRowBinding,
+    title: String,
+    subtitle: String,
+    onChange: (Boolean) -> Unit,
+    current: () -> Boolean
+) {
+    row.title.text = title
+    row.subtitle.text = subtitle
+    row.switchView.setOnClickListener {
+        <span class="hl">onChange(row.switchView.isChecked)</span>
+        <span class="hl">row.switchView.isChecked = current()</span>
+    }
+}
+
+<span class="c">// подписка на состояние с учетом жизненного цикла</span>
+<span class="hl">lifecycleScope.launch {</span>
+<span class="hl">    repeatOnLifecycle(Lifecycle.State.STARTED) {</span>
+<span class="hl">        launch { vm.timeBlock.collect {</span>
+<span class="hl">            binding.rowTimeBlock.switchView.isChecked = it } }</span>
+<span class="hl">    }</span>
+<span class="hl">}</span></pre>
+        </div>
+        <p class="legend"><i></i>Экран нужно обновлять вручную: слушатель, возврат значения и подписка.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="metrics">
+    <h2>Что показали измерения</h2>
+    <p>Те же компоненты реализованы в приложении на Compose и в эквивалентном XML-варианте. Считались логические строки кода: без пустых строк, комментариев и импортов.</p>
+
+    <div class="bars">
+      <div class="keys"><span><i class="a"></i>Jetpack Compose</span><span><i class="b"></i>XML + View System</span></div>
+
+      <div class="bar-row">
+        <div class="lbl">Экран настроек <em>Compose короче на 23 %</em></div>
+        <div class="bar cm" style="width:calc(118 / 362 * 80%)"><span>118</span></div>
+        <div class="bar xm" style="width:calc(153 / 362 * 80%)"><span>153</span></div>
+      </div>
+      <div class="bar-row">
+        <div class="lbl">Параметры блокировки <em>Compose короче на 33 %</em></div>
+        <div class="bar cm" style="width:calc(105 / 362 * 80%)"><span>105</span></div>
+        <div class="bar xm" style="width:calc(157 / 362 * 80%)"><span>157</span></div>
+      </div>
+      <div class="bar-row">
+        <div class="lbl">Нижняя навигация <em>XML короче на 38 %</em></div>
+        <div class="bar cm" style="width:calc(84 / 362 * 80%)"><span>84</span></div>
+        <div class="bar xm" style="width:calc(52 / 362 * 80%)"><span>52</span></div>
+      </div>
+      <div class="bar-row">
+        <div class="lbl">Всего <em>Compose короче на 15 %</em></div>
+        <div class="bar cm" style="width:calc(307 / 362 * 80%)"><span>307</span></div>
+        <div class="bar xm" style="width:80%"><span>362</span></div>
+      </div>
+    </div>
+
+    <div class="facts">
+      <div class="fact"><b><span>3</span> против 13</b><small>файлов для трех компонентов</small></div>
+      <div class="fact"><b><span>6</span> против 18</b><small>строк связывания состояния двух переключателей</small></div>
+      <div class="fact"><b><span>–15 %</span></b><small>общий объем кода в пользу Compose</small></div>
+    </div>
+
+    <p class="note">Выигрыш Compose неоднороден: он заметнее на экранах с динамическим состоянием, а стандартные декларативные элементы вроде нижней навигации в XML могут быть компактнее. Скорость разработки и производительность в этой работе не измерялись. XML-вариант выполнен автором специально для сравнения, поэтому результат относится к одному приложению и трем компонентам.</p>
+  </section>
+
+  <footer>
+    Исходный код демо: <a href="https://github.com/ВАШ-АККАУНТ/compose-vs-xml-demo">github.com/ВАШ-АККАУНТ/compose-vs-xml-demo</a>
+  </footer>
+</div>
+
+<script>
+(function () {
+  var TABS = ['Главная', 'Защита', 'Избранное'];
+  var ICONS = {
+    star: 'M12,17.27L18.18,21l-1.64,-7.03L22,9.24l-7.19,-0.61L12,2 9.19,8.63 2,9.24l5.46,4.73L5.82,21z',
+    info: 'M12,2C6.48,2 2,6.48 2,12s4.48,10 10,10 10,-4.48 10,-10S17.52,2 12,2zM13,17h-2v-6h2v6zM13,9h-2L11,7h2v2z',
+    home: 'M10,20v-6h4v6h5v-8h3L12,3 2,12h3v8z',
+    lock: 'M18,8h-1V6c0,-2.76 -2.24,-5 -5,-5S7,3.24 7,6v2H6c-1.1,0 -2,0.9 -2,2v10c0,1.1 0.9,2 2,2h12c1.1,0 2,-0.9 2,-2V10c0,-1.1 -0.9,-2 -2,-2zM12,17c-1.1,0 -2,-0.9 -2,-2s0.9,-2 2,-2 2,0.9 2,2 -0.9,2 -2,2zM15.1,8H8.9V6c0,-1.71 1.39,-3.1 3.1,-3.1 1.71,0 3.1,1.39 3.1,3.1v2z'
+  };
+  var NAV_ICONS = ['home', 'lock', 'star'];
+
+  // Состояние: единственный источник истины
+  var state = { notifications: true, timeBlock: false, count: 0, tab: 0, status: '' };
+  var rejected = false;
+
+  // Действия (аналог ViewModel)
+  var actions = {
+    notifications: function (v) {
+      state.notifications = v;
+      state.status = v ? 'Уведомления включены' : 'Уведомления выключены';
+    },
+    timeBlock: function (v) {
+      if (v) { state.status = 'Функция временно недоступна'; rejected = true; }
+    },
+    row: function (name) { state.status = 'Открыто: ' + name; },
+    increment: function () { state.count++; },
+    tab: function (i) { state.tab = i; }
+  };
+
+  function svg(name) {
+    return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="' + ICONS[name] + '"/></svg>';
+  }
+  function settingRow(icon, title, sub, key) {
+    return '<button class="row" data-key="' + key + '" data-action="row" data-arg="' + title + '">' + svg(icon) +
+      '<span class="txt"><b>' + title + '</b><small>' + sub + '</small></span></button>';
+  }
+  function switchRow(title, sub, checked, key, shake) {
+    return '<div class="swrow' + (shake ? ' reject' : '') + '"><span class="txt"><b>' + title + '</b><small>' + sub + '</small></span>' +
+      '<button class="sw" role="switch" aria-label="' + title + '" aria-checked="' + checked + '" data-key="' + key + '" data-action="' + key + '" data-arg="' + (!checked) + '"></button></div>';
+  }
+
+  var content = document.getElementById('content');
+  var nav = document.getElementById('nav');
+  var stateBox = document.getElementById('state');
+
+  function render() {
+    var focusKey = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.key : null;
+    var shake = rejected; rejected = false;
+
+    content.innerHTML =
+      '<h2 class="scr-title">Наст<span>ройки</span></h2>' +
+      '<p class="scr-sub">Дополнительные функции и информация</p>' +
+      settingRow('star', 'Премиум', 'Доступ к дополнительным функциям', 'row1') +
+      settingRow('info', 'О приложении', 'Версия 1.0.0', 'row2') +
+      switchRow('Уведомления', 'Показывать оповещения', state.notifications, 'notifications', false) +
+      switchRow('Блокировка по времени', 'Пока недоступно', state.timeBlock, 'timeBlock', shake) +
+      '<button class="counter" data-key="counter" data-action="increment">Нажатий: ' + state.count + '</button>' +
+      '<div class="status">Раздел: ' + TABS[state.tab] + (state.status ? ' | ' + state.status : ' |') + '</div>';
+
+    nav.innerHTML = TABS.map(function (t, i) {
+      return '<button data-key="tab' + i + '" data-action="tab" data-arg="' + i + '"' + (state.tab === i ? ' aria-current="true"' : '') + '>' +
+        svg(NAV_ICONS[i]) + '<span>' + t + '</span></button>';
+    }).join('');
+
+    stateBox.innerHTML =
+      '<span class="k">notifications</span>  <span class="v">' + state.notifications + '</span>\n' +
+      '<span class="k">timeBlock</span>      <span class="v">' + state.timeBlock + '</span>\n' +
+      '<span class="k">count</span>          <span class="v">' + state.count + '</span>\n' +
+      '<span class="k">tab</span>            <span class="v">' + state.tab + '</span>\n' +
+      '<span class="k">status</span>         <span class="v">"' + state.status + '"</span>';
+
+    if (focusKey) {
+      var el = document.querySelector('[data-key="' + focusKey + '"]');
+      if (el) el.focus();
+    }
+  }
+
+  function onClick(e) {
+    var el = e.target.closest('[data-action]');
+    if (!el) return;
+    var name = el.dataset.action, arg = el.dataset.arg;
+    if (name === 'notifications' || name === 'timeBlock') arg = (arg === 'true');
+    else if (name === 'tab') arg = parseInt(arg, 10);
+    actions[name](arg);
+    render();
+  }
+  content.addEventListener('click', onClick);
+  nav.addEventListener('click', onClick);
+
+  render();
+})();
+</script>
+</body>
+</html>
